@@ -1,0 +1,147 @@
+{
+  "name": "EXAMPLE_WEEKLY_FLOW_ID",
+  "id": "/providers/Microsoft.Flow/flows/EXAMPLE_WEEKLY_FLOW_ID",
+  "type": "Microsoft.Flow/flows",
+  "properties": {
+    "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+    "displayName": "Montien Thai — Weekly KPI Report",
+    "definition": {
+      "metadata": {
+        "workflowEntityId": null,
+        "processAdvisorMetadata": null,
+        "flowChargedByPaygo": null,
+        "flowclientsuspensionreason": "None",
+        "flowclientsuspensiontime": null,
+        "flowclientsuspensionreasondetails": null,
+        "creator": {
+          "id": "EXAMPLE_USER_ID",
+          "type": "User",
+          "tenantId": "EXAMPLE_TENANT_ID"
+        },
+        "provisioningMethod": "FromDefinition",
+        "failureAlertSubscription": true,
+        "clientLastModifiedTime": "EXAMPLE_METADATA_TIMESTAMP",
+        "lastModifiedBy": "EXAMPLE_USER_ID",
+        "connectionKeySavedTimeKey": "EXAMPLE_METADATA_TIMESTAMP",
+        "creationSource": "Portal",
+        "modifiedSources": "Portal"
+      },
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "undefined",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "Recurrence": {
+          "recurrence": {
+            "frequency": "Week",
+            "interval": "1",
+            "startTime": "2026-10-11T12:00:00.000Z",
+            "schedule": {
+              "weekDays": [
+                "Monday"
+              ]
+            }
+          },
+          "evaluatedRecurrence": {
+            "frequency": "Week",
+            "interval": "1",
+            "startTime": "2026-10-11T12:00:00.000Z",
+            "schedule": {
+              "weekDays": [
+                "Monday"
+              ]
+            }
+          },
+          "type": "Recurrence"
+        }
+      },
+      "actions": {
+        "List_rows_present_in_a_table": {
+          "runAfter": {},
+          "metadata": {
+            "EXAMPLE_PREVIOUS_WORKBOOK_FILE_ID": "/EXAMPLE_UPLOAD_FOLDER/EXAMPLE_KPI_WORKBOOK.xlsx",
+            "tableId": "EXAMPLE_WEEKLY_TABLE_ID",
+            "EXAMPLE_WORKBOOK_FILE_ID": "/EXAMPLE_FOLDER/EXAMPLE_KPI_WORKBOOK.xlsx"
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "source": "me",
+              "drive": "EXAMPLE_DRIVE_ID",
+              "file": "EXAMPLE_WORKBOOK_FILE_ID",
+              "table": "EXAMPLE_WEEKLY_TABLE_ID"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+              "connectionName": "shared_excelonlinebusiness",
+              "operationId": "GetItems"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Create_HTML_table": {
+          "runAfter": {
+            "List_rows_present_in_a_table": [
+              "Succeeded"
+            ]
+          },
+          "type": "Table",
+          "inputs": {
+            "from": "@outputs('List_rows_present_in_a_table')?['body/value']",
+            "format": "HTML"
+          }
+        },
+        "Send_an_email_(V2)": {
+          "runAfter": {
+            "Create_HTML_table": [
+              "Succeeded"
+            ]
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "emailMessage/To": "owner@example.com",
+              "emailMessage/Subject": "Montien Thai — Weekly KPI Report",
+              "emailMessage/Body": "<p class=\"editor-paragraph\">The Montien Thai KPI report for the review periods is as follows:<br><br>Illustrative sample data for demonstration purposes only</p><br><p class=\"editor-paragraph\">@{body('Create_HTML_table')}</p><br><p class=\"editor-paragraph\">View dashboard: https://example.com/EXAMPLE_DASHBOARD</p>",
+              "emailMessage/Importance": "Normal"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+              "connectionName": "shared_office365",
+              "operationId": "SendEmailV2"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      }
+    },
+    "connectionReferences": {
+      "shared_excelonlinebusiness": {
+        "connectionName": "EXAMPLE_CONNECTION_SHARED_EXCELONLINEBUSINESS",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+        "tier": "NotSpecified",
+        "apiName": "excelonlinebusiness",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      },
+      "shared_office365": {
+        "connectionName": "EXAMPLE_CONNECTION_SHARED_OFFICE365",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "tier": "NotSpecified",
+        "apiName": "office365",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      }
+    },
+    "flowFailureAlertSubscribed": false,
+    "isManaged": false
+  }
+}

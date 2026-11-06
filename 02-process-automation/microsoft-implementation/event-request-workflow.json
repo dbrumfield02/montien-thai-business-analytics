@@ -1,0 +1,364 @@
+{
+  "name": "EXAMPLE_EVENT_FLOW_ID",
+  "id": "/providers/Microsoft.Flow/flows/EXAMPLE_EVENT_FLOW_ID",
+  "type": "Microsoft.Flow/flows",
+  "properties": {
+    "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+    "displayName": "Montien_event_request_approval.",
+    "definition": {
+      "metadata": {
+        "workflowEntityId": null,
+        "processAdvisorMetadata": null,
+        "flowChargedByPaygo": null,
+        "flowclientsuspensionreason": "None",
+        "flowclientsuspensiontime": null,
+        "flowclientsuspensionreasondetails": null,
+        "creator": {
+          "id": "EXAMPLE_USER_ID",
+          "type": "User",
+          "tenantId": "EXAMPLE_TENANT_ID"
+        },
+        "provisioningMethod": "FromDefinition",
+        "failureAlertSubscription": true,
+        "clientLastModifiedTime": "EXAMPLE_METADATA_TIMESTAMP",
+        "lastModifiedBy": "EXAMPLE_USER_ID",
+        "connectionKeySavedTimeKey": "EXAMPLE_METADATA_TIMESTAMP",
+        "creationSource": "Portal",
+        "modifiedSources": "Portal"
+      },
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "When_a_new_response_is_submitted": {
+          "splitOn": "@triggerOutputs()?['body/value']",
+          "type": "OpenApiConnectionWebhook",
+          "inputs": {
+            "parameters": {
+              "form_id": "EXAMPLE_EVENT_FORM_ID"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_microsoftforms",
+              "connectionName": "shared_microsoftforms",
+              "operationId": "CreateFormWebhook"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      },
+      "actions": {
+        "Get_response_details": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "form_id": "EXAMPLE_EVENT_FORM_ID",
+              "response_id": "@triggerOutputs()?['body/resourceData/responseId']"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_microsoftforms",
+              "connectionName": "shared_microsoftforms-1",
+              "operationId": "GetFormResponseById"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Create_item": {
+          "runAfter": {
+            "Compose": [
+              "Succeeded"
+            ]
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "dataset": "https://example.com/sites/EXAMPLE_SHAREPOINT_SITE",
+              "table": "EXAMPLE_EVENT_LIST_ID",
+              "item/GuestEmail": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_GUESTEMAIL']",
+              "item/RequestedDate": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_REQUESTEDDATE']",
+              "item/NumberofGuests": "@int(outputs('Compose'))",
+              "item/Occasion": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_OCCASION']",
+              "item/Title": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_GUEST_NAME']",
+              "item/RequestedTime/Value": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_REQUESTEDTIME']",
+              "item/RequestType/Value": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_REQUESTTYPE']",
+              "item/AdditionalRequests": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_ADDITIONALREQUESTS']",
+              "item/Status/Value": "Pending"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+              "connectionName": "shared_sharepointonline",
+              "operationId": "PostItem"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Compose": {
+          "runAfter": {
+            "Get_response_details": [
+              "Succeeded"
+            ]
+          },
+          "type": "Compose",
+          "inputs": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_PARTY_SIZE']"
+        },
+        "Condition": {
+          "actions": {
+            "Start_and_wait_for_an_approval": {
+              "type": "OpenApiConnectionWebhook",
+              "inputs": {
+                "parameters": {
+                  "approvalType": "Basic",
+                  "WebhookApprovalCreationInput/title": "Montien event request",
+                  "WebhookApprovalCreationInput/assignedTo": "manager@example.com",
+                  "WebhookApprovalCreationInput/details": "Guest’s name, requested date, party size, occasion, special requests from Get response details",
+                  "WebhookApprovalCreationInput/enableNotifications": true,
+                  "WebhookApprovalCreationInput/enableReassignment": true
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_approvals",
+                  "connectionName": "shared_approvals-1",
+                  "operationId": "StartAndWaitForAnApproval"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Condition_1": {
+              "actions": {
+                "Update_item": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "parameters": {
+                      "dataset": "https://example.com/sites/EXAMPLE_SHAREPOINT_SITE",
+                      "table": "EXAMPLE_EVENT_LIST_ID",
+                      "id": "@outputs('Create_item')?['body/ID']",
+                      "item/GuestEmail": "@outputs('Create_item')?['body/GuestEmail']",
+                      "item/RequestedDate": "@outputs('Create_item')?['body/RequestedDate']",
+                      "item/NumberofGuests": "@outputs('Create_item')?['body/NumberofGuests']",
+                      "item/Occasion": "@outputs('Create_item')?['body/Occasion']",
+                      "item/Status/Value": "Approved"
+                    },
+                    "host": {
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                      "connectionName": "shared_sharepointonline",
+                      "operationId": "PatchItem"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                },
+                "Send_an_email_(V2)_1": {
+                  "runAfter": {
+                    "Update_item": [
+                      "Succeeded"
+                    ]
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "parameters": {
+                      "emailMessage/To": "@outputs('Update_item')?['body/GuestEmail']",
+                      "emailMessage/Subject": "Your Montien event request is approved",
+                      "emailMessage/Body": "<p class=\"editor-paragraph\">Hello , @{outputs('Get_response_details')?['body/EXAMPLE_FIELD_GUEST_NAME']}</p><br><p class=\"editor-paragraph\">Your event request has been approved. We look forward to welcoming your party to Montien Thai.</p>",
+                      "emailMessage/Importance": "Normal"
+                    },
+                    "host": {
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                      "connectionName": "shared_office365",
+                      "operationId": "SendEmailV2"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              },
+              "runAfter": {
+                "Start_and_wait_for_an_approval": [
+                  "Succeeded"
+                ]
+              },
+              "else": {
+                "actions": {
+                  "Update_item_1": {
+                    "type": "OpenApiConnection",
+                    "inputs": {
+                      "parameters": {
+                        "dataset": "https://example.com/sites/EXAMPLE_SHAREPOINT_SITE",
+                        "table": "EXAMPLE_EVENT_LIST_ID",
+                        "id": "@outputs('Create_item')?['body/ID']",
+                        "item/GuestEmail": "@outputs('Create_item')?['body/GuestEmail']",
+                        "item/RequestedDate": "@outputs('Create_item')?['body/RequestedDate']",
+                        "item/NumberofGuests": "@outputs('Create_item')?['body/NumberofGuests']",
+                        "item/Occasion": "/@{outputs('Create_item')?['body/Occasion']}",
+                        "item/Status/Value": "Declined"
+                      },
+                      "host": {
+                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                        "connectionName": "shared_sharepointonline",
+                        "operationId": "PatchItem"
+                      },
+                      "authentication": "@parameters('$authentication')"
+                    }
+                  },
+                  "For_each": {
+                    "foreach": "@outputs('Start_and_wait_for_an_approval')?['body/responses']",
+                    "actions": {
+                      "Send_an_email_(V2)": {
+                        "type": "OpenApiConnection",
+                        "inputs": {
+                          "parameters": {
+                            "emailMessage/To": "@outputs('Update_item_1')?['body/GuestEmail']",
+                            "emailMessage/Subject": "Update on your Montien event request",
+                            "emailMessage/Body": "<p class=\"editor-paragraph\">Hello ,@{outputs('Get_response_details')?['body/EXAMPLE_FIELD_GUEST_NAME']}</p><br><p class=\"editor-paragraph\">Thank you for your interest in Montien Thai. Unfortunately, we’re unable to approve your event request.<br><br>Manager’s comments:</p><p class=\"editor-paragraph\">@{items('For_each')?['comments']}</p><br>",
+                            "emailMessage/Importance": "Normal"
+                          },
+                          "host": {
+                            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                            "connectionName": "shared_office365",
+                            "operationId": "SendEmailV2"
+                          },
+                          "authentication": "@parameters('$authentication')"
+                        }
+                      }
+                    },
+                    "runAfter": {
+                      "Update_item_1": [
+                        "Succeeded"
+                      ]
+                    },
+                    "type": "Foreach"
+                  }
+                }
+              },
+              "expression": {
+                "and": [
+                  {
+                    "equals": [
+                      "@outputs('Start_and_wait_for_an_approval')?['body/outcome']",
+                      "Approve"
+                    ]
+                  }
+                ]
+              },
+              "type": "If"
+            }
+          },
+          "runAfter": {
+            "Create_item": [
+              "Succeeded"
+            ]
+          },
+          "else": {
+            "actions": {
+              "Update_item_2": {
+                "type": "OpenApiConnection",
+                "inputs": {
+                  "parameters": {
+                    "dataset": "https://example.com/sites/EXAMPLE_SHAREPOINT_SITE",
+                    "table": "EXAMPLE_EVENT_LIST_ID",
+                    "id": "@outputs('Create_item')?['body/ID']",
+                    "item/GuestEmail": "@outputs('Create_item')?['body/GuestEmail']",
+                    "item/RequestedDate": "@outputs('Create_item')?['body/RequestedDate']",
+                    "item/NumberofGuests": "@outputs('Create_item')?['body/NumberofGuests']",
+                    "item/Occasion": "@outputs('Create_item')?['body/Occasion']",
+                    "item/Status/Value": "Approved"
+                  },
+                  "host": {
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                    "connectionName": "shared_sharepointonline",
+                    "operationId": "PatchItem"
+                  },
+                  "authentication": "@parameters('$authentication')"
+                }
+              },
+              "Send_an_email_(V2)_1_1": {
+                "runAfter": {
+                  "Update_item_2": [
+                    "Succeeded"
+                  ]
+                },
+                "type": "OpenApiConnection",
+                "inputs": {
+                  "parameters": {
+                    "emailMessage/To": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_GUESTEMAIL']",
+                    "emailMessage/Subject": "Your Montien event request is approved",
+                    "emailMessage/Body": "<p class=\"editor-paragraph\">Your event request has been approved. We look forward to welcoming your party to Montien Thai.</p>",
+                    "emailMessage/Importance": "Normal"
+                  },
+                  "host": {
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                    "connectionName": "shared_office365",
+                    "operationId": "SendEmailV2"
+                  },
+                  "authentication": "@parameters('$authentication')"
+                }
+              }
+            }
+          },
+          "expression": {
+            "and": [
+              {
+                "greaterOrEquals": [
+                  "@int(outputs('Compose'))",
+                  8
+                ]
+              }
+            ]
+          },
+          "type": "If"
+        }
+      },
+      "outputs": {},
+      "description": ""
+    },
+    "connectionReferences": {
+      "shared_microsoftforms": {
+        "connectionName": "EXAMPLE_CONNECTION_SHARED_MICROSOFTFORMS",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_microsoftforms",
+        "tier": "NotSpecified",
+        "apiName": "microsoftforms",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      },
+      "shared_microsoftforms-1": {
+        "connectionName": "EXAMPLE_CONNECTION_SHARED_MICROSOFTFORMS_1",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_microsoftforms",
+        "tier": "NotSpecified",
+        "apiName": "microsoftforms",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      },
+      "shared_sharepointonline": {
+        "connectionName": "EXAMPLE_CONNECTION_SHARED_SHAREPOINTONLINE",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+        "tier": "NotSpecified",
+        "apiName": "sharepointonline",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      },
+      "shared_approvals-1": {
+        "connectionName": "EXAMPLE_CONNECTION_SHARED_APPROVALS_1",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_approvals",
+        "tier": "NotSpecified",
+        "apiName": "approvals",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      },
+      "shared_office365": {
+        "connectionName": "EXAMPLE_CONNECTION_SHARED_OFFICE365",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "tier": "NotSpecified",
+        "apiName": "office365",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      }
+    },
+    "flowFailureAlertSubscribed": false,
+    "isManaged": false
+  }
+}

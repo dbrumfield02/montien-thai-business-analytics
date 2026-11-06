@@ -1,0 +1,208 @@
+{
+  "name": "EXAMPLE_OWNER_FLOW_ID",
+  "id": "/providers/Microsoft.Flow/flows/EXAMPLE_OWNER_FLOW_ID",
+  "type": "Microsoft.Flow/flows",
+  "properties": {
+    "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+    "displayName": "Montien Weekly Owner Report",
+    "definition": {
+      "metadata": {
+        "workflowEntityId": null,
+        "processAdvisorMetadata": null,
+        "flowChargedByPaygo": null,
+        "flowclientsuspensionreason": "None",
+        "flowclientsuspensiontime": null,
+        "flowclientsuspensionreasondetails": null,
+        "creator": {
+          "id": "EXAMPLE_USER_ID",
+          "type": "User",
+          "tenantId": "EXAMPLE_TENANT_ID"
+        },
+        "provisioningMethod": "FromDefinition",
+        "failureAlertSubscription": true,
+        "clientLastModifiedTime": "EXAMPLE_METADATA_TIMESTAMP",
+        "lastModifiedBy": "EXAMPLE_USER_ID",
+        "connectionKeySavedTimeKey": "EXAMPLE_METADATA_TIMESTAMP",
+        "creationSource": "Portal",
+        "modifiedSources": "Portal"
+      },
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "undefined",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "Recurrence": {
+          "recurrence": {
+            "frequency": "Week",
+            "interval": "1",
+            "startTime": "2026-10-07T13:00:00.000Z",
+            "schedule": {
+              "weekDays": [
+                "Monday"
+              ]
+            }
+          },
+          "evaluatedRecurrence": {
+            "frequency": "Week",
+            "interval": "1",
+            "startTime": "2026-10-07T13:00:00.000Z",
+            "schedule": {
+              "weekDays": [
+                "Monday"
+              ]
+            }
+          },
+          "type": "Recurrence"
+        }
+      },
+      "actions": {
+        "Event_Items": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "dataset": "https://example.com/sites/EXAMPLE_SHAREPOINT_SITE",
+              "table": "EXAMPLE_EVENT_LIST_ID",
+              "$filter": "@concat(\n  'Created ge ''',\n  formatDateTime(addDays(utcNow(), -7), 'yyyy-MM-ddTHH:mm:ssZ'),\n  ''' and Created lt ''',\n  formatDateTime(utcNow(), 'yyyy-MM-ddTHH:mm:ssZ'),\n  ''''\n)"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+              "connectionName": "shared_sharepointonline",
+              "operationId": "GetItems"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runtimeConfiguration": {
+            "paginationPolicy": {
+              "minimumItemCount": 5000
+            }
+          }
+        },
+        "Feedback_Items": {
+          "runAfter": {
+            "Event_Items": [
+              "Succeeded"
+            ]
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "dataset": "https://example.com/sites/EXAMPLE_SHAREPOINT_SITE",
+              "table": "EXAMPLE_FEEDBACK_LIST_ID",
+              "$filter": "@concat(\n  'Created ge ''',\n  formatDateTime(addDays(utcNow(), -7), 'yyyy-MM-ddTHH:mm:ssZ'),\n  ''' and Created lt ''',\n  formatDateTime(utcNow(), 'yyyy-MM-ddTHH:mm:ssZ'),\n  ''''\n)"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+              "connectionName": "shared_sharepointonline",
+              "operationId": "GetItems"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runtimeConfiguration": {
+            "paginationPolicy": {
+              "minimumItemCount": 5000
+            }
+          }
+        },
+        "Send_an_email_(V2)": {
+          "runAfter": {
+            "Pending_Items": [
+              "Succeeded"
+            ]
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "emailMessage/To": "owner@example.com",
+              "emailMessage/Subject": "Montien Weekly Owner Report",
+              "emailMessage/Body": "<p class=\"editor-paragraph\">Montien Thai — Weekly Owner Report<br><br>Reporting period: the previous seven days.<br><br>Feedback responses received: @{length(body('Feedback_Items')?['value'])}</p><br><p class=\"editor-paragraph\">Feedback requiring follow-up: @{length(body('Follow_Up_Items'))}</p><br><p class=\"editor-paragraph\">Event requests received: @{length(body('Event_Items')?['value'])}</p><br><p class=\"editor-paragraph\">Approved: @{length(body('Approved_Items'))}<br>Declined: @{length(body('Declined_Items'))}<br>Pending: @{length(body('Pending_Items'))}</p>",
+              "emailMessage/Importance": "Normal"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+              "connectionName": "shared_office365",
+              "operationId": "SendEmailV2"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Follow_Up_Items": {
+          "runAfter": {
+            "Feedback_Items": [
+              "Succeeded"
+            ]
+          },
+          "type": "Query",
+          "inputs": {
+            "from": "@body('Feedback_Items')?['value']",
+            "where": "@equals(item()?['Follow_Up'],true)"
+          }
+        },
+        "Approved_Items": {
+          "runAfter": {
+            "Follow_Up_Items": [
+              "Succeeded"
+            ]
+          },
+          "type": "Query",
+          "inputs": {
+            "from": "@outputs('Event_Items')?['body/value']",
+            "where": "@equals(item()?['Status']?['Value'],'Approved')"
+          }
+        },
+        "Declined_Items": {
+          "runAfter": {
+            "Approved_Items": [
+              "Succeeded"
+            ]
+          },
+          "type": "Query",
+          "inputs": {
+            "from": "@outputs('Event_Items')?['body/value']",
+            "where": "@equals(item()?['Status']?['Value'],'Declined')"
+          }
+        },
+        "Pending_Items": {
+          "runAfter": {
+            "Declined_Items": [
+              "Succeeded"
+            ]
+          },
+          "type": "Query",
+          "inputs": {
+            "from": "@outputs('Event_Items')?['body/value']",
+            "where": "@equals(item()?['Status']?['Value'],'Pending')"
+          }
+        }
+      }
+    },
+    "connectionReferences": {
+      "shared_sharepointonline": {
+        "connectionName": "EXAMPLE_CONNECTION_SHARED_SHAREPOINTONLINE",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+        "tier": "NotSpecified",
+        "apiName": "sharepointonline",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      },
+      "shared_office365": {
+        "connectionName": "EXAMPLE_CONNECTION_SHARED_OFFICE365",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "tier": "NotSpecified",
+        "apiName": "office365",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      }
+    },
+    "flowFailureAlertSubscribed": false,
+    "isManaged": false
+  }
+}

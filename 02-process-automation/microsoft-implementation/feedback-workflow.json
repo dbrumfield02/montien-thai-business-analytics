@@ -1,0 +1,251 @@
+{
+  "name": "EXAMPLE_FEEDBACK_FLOW_ID",
+  "id": "/providers/Microsoft.Flow/flows/EXAMPLE_FEEDBACK_FLOW_ID",
+  "type": "Microsoft.Flow/flows",
+  "properties": {
+    "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+    "displayName": "Montien Feedback",
+    "definition": {
+      "metadata": {
+        "workflowEntityId": null,
+        "processAdvisorMetadata": null,
+        "flowChargedByPaygo": null,
+        "flowclientsuspensionreason": "None",
+        "flowclientsuspensiontime": null,
+        "flowclientsuspensionreasondetails": null,
+        "creator": {
+          "id": "EXAMPLE_USER_ID",
+          "type": "User",
+          "tenantId": "EXAMPLE_TENANT_ID"
+        },
+        "provisioningMethod": "FromDefinition",
+        "failureAlertSubscription": true,
+        "clientLastModifiedTime": "EXAMPLE_METADATA_TIMESTAMP",
+        "lastModifiedBy": "EXAMPLE_USER_ID",
+        "connectionKeySavedTimeKey": "EXAMPLE_METADATA_TIMESTAMP",
+        "creationSource": "Portal",
+        "modifiedSources": "Portal"
+      },
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "When_a_new_response_is_submitted": {
+          "splitOn": "@triggerOutputs()?['body/value']",
+          "type": "OpenApiConnectionWebhook",
+          "inputs": {
+            "parameters": {
+              "form_id": "EXAMPLE_FEEDBACK_FORM_ID"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_microsoftforms",
+              "connectionName": "shared_microsoftforms",
+              "operationId": "CreateFormWebhook"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      },
+      "actions": {
+        "Get_response_details": {
+          "runAfter": {},
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "form_id": "EXAMPLE_FEEDBACK_FORM_ID",
+              "response_id": "@triggerOutputs()?['body/resourceData/responseId']"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_microsoftforms",
+              "connectionName": "shared_microsoftforms",
+              "operationId": "GetFormResponseById"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Create_item": {
+          "runAfter": {
+            "Compose": [
+              "Succeeded"
+            ]
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "dataset": "https://example.com/sites/EXAMPLE_SHAREPOINT_SITE",
+              "table": "EXAMPLE_FEEDBACK_LIST_ID",
+              "item/Guest_Email": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_GUEST_EMAIL']",
+              "item/Visit_Date": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_VISIT_DATE']",
+              "item/Rating": "@int(outputs('Compose'))",
+              "item/Follow_Up": "@false",
+              "item/Title": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_GUEST_NAME']",
+              "item/Additional_Feedback": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_ADDITIONAL_FEEDBACK']"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+              "connectionName": "shared_sharepointonline",
+              "operationId": "PostItem"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Compose": {
+          "runAfter": {
+            "Get_response_details": [
+              "Succeeded"
+            ]
+          },
+          "type": "Compose",
+          "inputs": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_RATING']"
+        },
+        "Send_an_email_(V2)": {
+          "runAfter": {
+            "Create_item": [
+              "Succeeded"
+            ]
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "emailMessage/To": "@outputs('Get_response_details')?['body/EXAMPLE_FIELD_GUEST_EMAIL']",
+              "emailMessage/Subject": "Thank you for visiting Montien Thai",
+              "emailMessage/Body": "<p class=\"editor-paragraph\">Hi ,@{outputs('Get_response_details')?['body/EXAMPLE_FIELD_GUEST_NAME']}</p><br><p class=\"editor-paragraph\">Thank you for visiting Montien Thai and sharing your feedback. Your comments help us improve our guests’ experience. We hope to welcome you again soon!</p><br><p class=\"editor-paragraph\">Regards,</p><p class=\"editor-paragraph\">Montien Thai</p>",
+              "emailMessage/Importance": "Normal"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+              "connectionName": "shared_office365",
+              "operationId": "SendEmailV2"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Condition": {
+          "actions": {
+            "Update_item": {
+              "type": "OpenApiConnection",
+              "inputs": {
+                "parameters": {
+                  "dataset": "https://example.com/sites/EXAMPLE_SHAREPOINT_SITE",
+                  "table": "EXAMPLE_FEEDBACK_LIST_ID",
+                  "id": "@outputs('Create_item')?['body/ID']",
+                  "item/Guest_Email": "@outputs('Create_item')?['body/Guest_Email']",
+                  "item/Visit_Date": "@outputs('Create_item')?['body/Visit_Date']",
+                  "item/Rating": "@outputs('Create_item')?['body/Rating']",
+                  "item/Follow_Up": true
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "PatchItem"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Send_an_email_(V2)_1": {
+              "runAfter": {
+                "Update_item": [
+                  "Succeeded"
+                ]
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "parameters": {
+                  "emailMessage/To": "manager@example.com",
+                  "emailMessage/Subject": "Montien guest feedback needs follow-up",
+                  "emailMessage/Body": "<p class=\"editor-paragraph\">Guest’s name: @{outputs('Get_response_details')?['body/EXAMPLE_FIELD_GUEST_NAME']}</p><p class=\"editor-paragraph\">Rating: @{outputs('Update_item')?['body/Rating']}</p><p class=\"editor-paragraph\">Comments: @{outputs('Update_item')?['body/Additional_Feedback']}</p>",
+                  "emailMessage/Importance": "Normal"
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+                  "connectionName": "shared_office365",
+                  "operationId": "SendEmailV2"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          },
+          "runAfter": {
+            "Send_an_email_(V2)": [
+              "Succeeded"
+            ]
+          },
+          "else": {
+            "actions": {
+              "Update_item_1": {
+                "type": "OpenApiConnection",
+                "inputs": {
+                  "parameters": {
+                    "dataset": "https://example.com/sites/EXAMPLE_SHAREPOINT_SITE",
+                    "table": "EXAMPLE_FEEDBACK_LIST_ID",
+                    "id": "@outputs('Create_item')?['body/ID']",
+                    "item/Guest_Email": "@outputs('Create_item')?['body/Guest_Email']",
+                    "item/Visit_Date": "@outputs('Create_item')?['body/Visit_Date']",
+                    "item/Rating": "@outputs('Create_item')?['body/Rating']",
+                    "item/Follow_Up": false
+                  },
+                  "host": {
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                    "connectionName": "shared_sharepointonline",
+                    "operationId": "PatchItem"
+                  },
+                  "authentication": "@parameters('$authentication')"
+                }
+              }
+            }
+          },
+          "expression": {
+            "and": [
+              {
+                "lessOrEquals": [
+                  "@int(outputs('Compose'))",
+                  "@2"
+                ]
+              }
+            ]
+          },
+          "type": "If"
+        }
+      },
+      "outputs": {},
+      "description": ""
+    },
+    "connectionReferences": {
+      "shared_microsoftforms": {
+        "connectionName": "EXAMPLE_CONNECTION_SHARED_MICROSOFTFORMS",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_microsoftforms",
+        "tier": "NotSpecified",
+        "apiName": "microsoftforms",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      },
+      "shared_sharepointonline": {
+        "connectionName": "EXAMPLE_CONNECTION_SHARED_SHAREPOINTONLINE",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+        "tier": "NotSpecified",
+        "apiName": "sharepointonline",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      },
+      "shared_office365": {
+        "connectionName": "EXAMPLE_CONNECTION_SHARED_OFFICE365",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+        "tier": "NotSpecified",
+        "apiName": "office365",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      }
+    },
+    "flowFailureAlertSubscribed": false,
+    "isManaged": false
+  }
+}
